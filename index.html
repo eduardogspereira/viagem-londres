@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ef">
+  <title>Londres, dia a dia · meu roteiro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+  <style>
+    :root { --ink:#202620; --muted:#777b73; --paper:#f6f4ef; --green:#385c49; --line:#e7e4dc }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.5 'DM Sans',sans-serif }
+    .layout { min-height:100vh; display:grid; grid-template-columns:390px 1fr }
+    aside { height:100vh; overflow:auto; padding:34px 30px 24px; display:flex; flex-direction:column; border-right:1px solid var(--line) }
+    .eyebrow { color:var(--green); text-transform:uppercase; font-size:11px; font-weight:700; letter-spacing:.16em }
+    h1 { font:700 36px/1.1 'Playfair Display',serif; letter-spacing:-.04em; margin:8px 0 6px }
+    .intro { color:var(--muted); margin:0 0 26px }
+    .days { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:0 0 17px; border-bottom:1px solid var(--line) }
+    .day { min-width:0; white-space:nowrap; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:8px 5px; font:600 12px 'DM Sans',sans-serif; cursor:pointer }
+    .day:hover,.day.active { background:var(--green); color:#fff; border-color:var(--green) }
+    .section-title { display:flex; justify-content:space-between; align-items:center; margin:20px 0 9px }
+    .section-title h2 { font-size:12px; text-transform:uppercase; letter-spacing:.1em; margin:0 }
+    #count { color:var(--muted); font-size:12px }
+    #places { display:grid; gap:4px }
+    .place { text-align:left; display:grid; grid-template-columns:32px 1fr 18px; gap:10px; align-items:center; padding:11px 9px; border:0; background:transparent; border-radius:10px; color:inherit; cursor:pointer }
+    .place:hover,.place.selected { background:#ebe9e1 }
+    .number { width:27px; height:27px; display:grid; place-items:center; border-radius:50%; background:#e2e8df; color:var(--green); font-size:12px; font-weight:700 }
+    .place-name { font-weight:600; display:block }
+    .place-note { color:var(--muted); font-size:12px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; margin-top:1px }
+    .arrow { color:#a4a69e; font-size:17px }
+    .footer { border-top:1px solid var(--line); padding-top:15px; margin-top:auto; color:var(--muted); font-size:11px }
+    .map-wrap { min-height:100vh; position:relative; background:#e8e8df }
+    #map { position:absolute; inset:0 }
+    .map-label { position:absolute; z-index:1; top:22px; right:22px; background:#fff; padding:9px 13px; border-radius:8px; box-shadow:0 2px 12px #15231a14; font-size:12px; font-weight:600 }
+    .map-error { position:absolute; z-index:2; inset:0; display:none; place-items:center; padding:24px; text-align:center; background:#e8e8df; color:var(--ink) }
+    .map-error div { max-width:360px; background:#fff; padding:24px; border-radius:12px; box-shadow:0 8px 30px #15231a14 }
+    .map-error h2 { margin:0 0 7px; font:600 22px 'Playfair Display',serif }
+    .map-error p { margin:0; color:var(--muted) }
+    .mapboxgl-popup-content { font:13px 'DM Sans',sans-serif; border-radius:8px; padding:12px 15px }
+    .mapboxgl-popup-content strong { font-size:14px }
+    .place-time { color:var(--green); font-size:11px; font-weight:700; display:block; margin-bottom:2px }
+    .popup-card { width:260px; overflow:hidden; border-radius:8px; font:13px/1.45 'DM Sans',sans-serif }
+    .popup-card img { display:block; width:100%; height:145px; object-fit:cover; background:#e8e8df }
+    .popup-card img[hidden] { display:none }
+    .popup-copy { padding:11px 13px 13px }
+    .popup-copy strong { font-size:15px; display:block; margin-bottom:5px }
+    .popup-copy p { margin:0; color:#565d55 }
+    .popup-credit { display:block; margin-top:8px; font-size:10px; color:#777b73 }
+    .mapboxgl-ctrl-group { border-radius:8px!important; overflow:hidden }
+    @media(max-width:760px) {
+      .layout { grid-template-columns:1fr; grid-template-rows:54vh auto }
+      .map-wrap { min-height:54vh; grid-row:1 }
+      aside { height:auto; min-height:46vh; overflow:visible; padding:22px 20px }
+      h1 { font-size:30px }
+      .footer { margin-top:24px }
+      .map-label { top:12px; right:12px }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <aside>
+      <div class="eyebrow">28 dez 2026 — 6 jan 2027 · Base: Lambeth North</div>
+      <h1>Londres, dia a dia</h1>
+      <p class="intro">Passeios, horários sugeridos e lugares para descobrir.</p>
+      <nav class="days" id="days" aria-label="Filtrar por dia"></nav>
+      <div class="section-title"><h2 id="day-title">Todos os dias</h2><span id="count"></span></div>
+      <section id="places" aria-live="polite"></section>
+      <div class="footer">Toque em um lugar ou marcador para ver detalhes e foto. Fotos carregadas da Wikipédia.</div>
+    </aside>
+    <section class="map-wrap" aria-label="Mapa do roteiro em Londres">
+      <div id="map"></div>
+      <div class="map-label">Londres, Inglaterra</div>
+      <div class="map-error" id="map-error"><div><h2>Seu mapa começa aqui</h2><p>Adicione seu token público do Mapbox em <code>index.html</code> para carregar o mapa.</p></div></div>
+    </section>
+  </main>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+  <script>
+    const itinerary = [
+      { id:'2026-12-28', label:'Seg 28/12 · Chegada', pace:'Leve', places:[
+        { time:'14:30', name:'Aeroporto de Heathrow', note:'Chegada, imigração e retirada das malas. Como é feriado, confira o serviço do TfL antes de seguir viagem.', coordinates:[-0.4543,51.4700], wiki:'Heathrow Airport' },
+        { time:'16:00', name:'Paddington Station', note:'Elizabeth line desde Heathrow e conexão com a Bakerloo line até Lambeth North; trajeto estimado em cerca de uma hora.', coordinates:[-0.1764,51.5154], wiki:'Paddington station' },
+        { time:'17:00', name:'Hospedagem · Lambeth North', note:'Chegada à base em SE1 7BN, ao lado da estação Lambeth North.', coordinates:[-0.1123,51.4991], wiki:'Lambeth North tube station' },
+        { time:'Noite', name:'Westminster Bridge e Big Ben', note:'Caminhada de 15 minutos desde a hospedagem para ver o Big Ben, o Parlamento e a London Eye iluminados.', coordinates:[-0.1205,51.5010], wiki:'Big Ben' },
+        { time:'Noite', name:'London Eye', note:'A roda-gigante iluminada do outro lado do Tâmisa completa o cartão-postal da primeira noite.', coordinates:[-0.1195,51.5033], wiki:'London Eye' },
+      ]},
+      { id:'2026-12-29', label:'Ter 29/12 · Westminster e West End', pace:'Cheio', places:[
+        { time:'09:30', name:'Abadia de Westminster', note:'Abadia gótica onde reis são coroados desde 1066. Reserve cerca de 1h30; veja os túmulos de Elizabeth I, Newton e Darwin.', coordinates:[-0.1273,51.4994], wiki:'Westminster Abbey' },
+        { time:'11:30', name:'Parlamento e Big Ben', note:'O Palácio de Westminster, sede do Parlamento britânico, e a torre do relógio às margens do Tâmisa.', coordinates:[-0.1246,51.5007], wiki:'Palace of Westminster' },
+        { time:'11:45', name:'St James’s Park', note:'O parque real mais antigo de Londres; da ponte sobre o lago há uma bela vista do Palácio de Buckingham.', coordinates:[-0.1320,51.5025], wiki:'St James\'s Park' },
+        { time:'12:15', name:'Palácio de Buckingham', note:'Residência oficial do rei, conhecida pela fachada, pela sacada e pela troca da guarda.', coordinates:[-0.1419,51.5014], wiki:'Buckingham Palace' },
+        { time:'13:00', name:'Almoço em St James’s', note:'Pausa para almoço na região de St James’s, entre o parque e Trafalgar Square.', coordinates:[-0.1360,51.5070], wiki:'St James\'s, London' },
+        { time:'14:30', name:'Trafalgar Square', note:'Praça central com a coluna de Nelson e os leões de bronze. No período de Natal, costuma receber a árvore oferecida pela Noruega.', coordinates:[-0.1281,51.5080], wiki:'Trafalgar Square' },
+        { time:'15:00', name:'Leicester Square', note:'Praça dos cinemas e das estreias de filmes no West End.', coordinates:[-0.1280,51.5103], wiki:'Leicester Square' },
+        { time:'16:00', name:'Piccadilly Circus', note:'Cruzamento famoso pelos telões luminosos, a poucos passos das ruas do West End.', coordinates:[-0.1340,51.5101], wiki:'Piccadilly Circus' },
+        { time:'16:15', name:'Regent Street', note:'Rua histórica conhecida pelas luzes de Natal suspensas sobre a via.', coordinates:[-0.1407,51.5121], wiki:'Regent Street' },
+        { time:'16:30', name:'Chinatown', note:'Bairro de restaurantes e lanternas vermelhas, perto de Leicester Square.', coordinates:[-0.1310,51.5117], wiki:'Chinatown, London' },
+        { time:'18:00', name:'Covent Garden', note:'Antigo mercado coberto com lojas, artistas de rua e decoração de Natal.', coordinates:[-0.1220,51.5117], wiki:'Covent Garden' },
+      ]},
+      { id:'2026-12-30', label:'Qua 30/12 · Tower e City', pace:'Cheio', places:[
+        { time:'09:30', name:'Tower of London', note:'Fortaleza de quase mil anos que já foi palácio e prisão. Abriga as Joias da Coroa e os tours dos Beefeaters; reserve cerca de 3h.', coordinates:[-0.0759,51.5081], wiki:'Tower of London' },
+        { time:'12:30', name:'Tower Bridge Exhibition', note:'Suba às torres e atravesse a passarela com piso de vidro a 42 metros do rio; a visita leva cerca de 1h.', coordinates:[-0.0754,51.5055], wiki:'Tower Bridge' },
+        { time:'14:00', name:'Borough Market', note:'Mercado histórico de comida, ideal para almoço tardio e para provar pratos de várias barracas. Confirme os horários de fim de ano.', coordinates:[-0.0910,51.5055], wiki:'Borough Market' },
+        { time:'15:30', name:'Sky Garden', note:'Jardim no 35º andar com vista panorâmica gratuita. Reserve ingresso com antecedência; o horário define a ordem dos passeios.', coordinates:[-0.0838,51.5114], wiki:'Sky Garden' },
+      ]},
+      { id:'2026-12-31', label:'Qui 31/12 · Réveillon', pace:'Leve', places:[
+        { time:'10:00', name:'Madame Tussauds', note:'Museu de cera fundado em Londres em 1835, com figuras de celebridades, atletas e membros da família real. Reserve cerca de 2h.', coordinates:[-0.1547,51.5230], wiki:'Madame Tussauds' },
+        { time:'13:00', name:'Lambeth North · descanso', note:'Volta para a hospedagem e tarde de descanso antes da noite de Réveillon.', coordinates:[-0.1123,51.4991], wiki:'Lambeth North tube station' },
+        { time:'20:00', name:'Réveillon · London Eye', note:'Fogos à meia-noite. Entrada das 20h às 22h30, sem reentrada; confira o portão no ingresso. Área Branca: lado sul, via Waterloo, portão 8. Área Azul: lado norte, portão 1 (Victoria) ou 2 (Charing Cross/Embankment). Pontes fecham para pedestres. Leve passaporte, agasalho e bolsa pequena.', coordinates:[-0.1195,51.5033], wiki:'London New Year’s Eve fireworks' },
+      ]},
+      { id:'2027-01-01', label:'Sex 1/1 · Desfile e Hyde Park', pace:'Leve', places:[
+        { time:'13:00', name:'London Parade', note:'Desfile gratuito de Piccadilly até Parliament Square, com bandas, balões e participantes internacionais. Assistir por cerca de uma hora já dá uma boa ideia.', coordinates:[-0.1340,51.5101], wiki:'London New Year Parade' },
+        { time:'15:00', name:'Green Park', note:'Caminhada tranquila pelo parque real a caminho do Hyde Park.', coordinates:[-0.1420,51.5067], wiki:'Green Park' },
+        { time:'15:30', name:'Hyde Park', note:'Um dos grandes parques reais de Londres, ao lado do Winter Wonderland.', coordinates:[-0.1657,51.5073], wiki:'Hyde Park, London' },
+        { time:'17:00', name:'Winter Wonderland', note:'Parque de Natal no Hyde Park, com brinquedos, mercado, pista de patinação e atrações. Entrada reservada; confira o horário do feriado.', coordinates:[-0.1600,51.5078], wiki:'Hyde Park Winter Wonderland' },
+      ]},
+      { id:'2027-01-02', label:'Sáb 2/1 · Notting Hill e Kensington', pace:'Moderado', places:[
+        { time:'09:30', name:'Notting Hill e Portobello Road', note:'Bairro de casas coloridas e mercado de antiguidades aos sábados. Reserve de 2h a 2h30.', coordinates:[-0.2050,51.5150], wiki:'Portobello Road' },
+        { time:'12:30', name:'Churchill Arms', note:'Pub de 1750 conhecido pela decoração de Natal com pinheiros e luzes; serve comida tailandesa. Chegue cedo para almoçar.', coordinates:[-0.1928,51.5068], wiki:'The Churchill Arms' },
+        { time:'14:00', name:'Kensington Gardens e Palace', note:'Jardins reais e palácio ligado à rainha Vitória e à princesa Diana. Passeio pelos jardins e visita externa ao palácio.', coordinates:[-0.1877,51.5053], wiki:'Kensington Gardens' },
+        { time:'Opcional', name:'Natural History Museum', note:'Museu gratuito em um edifício monumental, com a galeria dos dinossauros e o esqueleto de baleia-azul no saguão.', coordinates:[-0.1764,51.4967], wiki:'Natural History Museum, London' },
+      ]},
+      { id:'2027-01-03', label:'Dom 3/1 · Greenwich', pace:'Leve', places:[
+        { time:'10:00', name:'Píer da London Eye', note:'Embarque no Uber Boat rumo a Greenwich; o trajeto pelo Tâmisa leva cerca de 45 minutos.', coordinates:[-0.1193,51.5035], wiki:'London Eye Pier' },
+        { time:'11:00', name:'Cutty Sark', note:'Veleiro de 1869 que transportava chá da China e foi um dos navios mais rápidos da época.', coordinates:[-0.0099,51.4820], wiki:'Cutty Sark' },
+        { time:'11:45', name:'Old Royal Naval College', note:'Conjunto barroco monumental à beira do rio e cenário de filmes de época.', coordinates:[-0.0055,51.4834], wiki:'Old Royal Naval College' },
+        { time:'13:00', name:'Greenwich Market', note:'Mercado coberto com artesanato e comida de rua de vários países.', coordinates:[-0.0098,51.4815], wiki:'Greenwich Market' },
+        { time:'14:30', name:'National Maritime Museum', note:'Museu gratuito sobre a história naval britânica; inclui objetos ligados ao almirante Nelson.', coordinates:[0.0045,51.4811], wiki:'National Maritime Museum' },
+        { time:'15:30', name:'Mirante do Greenwich Park', note:'Subida até a colina para ver os edifícios históricos e os arranha-céus de Londres. A vista do parque é gratuita; o Observatório Real está fechado para reforma segundo o roteiro.', coordinates:[0.0005,51.4769], wiki:'Greenwich Park' },
+      ]},
+      { id:'2027-01-04', label:'Seg 4/1 · Windsor', pace:'Moderado', places:[
+        { time:'09:30', name:'Estação Waterloo', note:'Partida de trem direto para Windsor & Eton Riverside; a viagem leva cerca de uma hora.', coordinates:[-0.1132,51.5033], wiki:'London Waterloo station' },
+        { time:'11:00', name:'Castelo de Windsor', note:'Residência real há quase mil anos e um dos maiores castelos habitados do mundo. Reserve de 2h30 a 3h e compre ingresso antecipado.', coordinates:[-0.6043,51.4839], wiki:'Windsor Castle' },
+        { time:'14:00', name:'Windsor e Long Walk', note:'Passeio pela cidade e pela avenida arborizada que leva ao castelo. O roteiro indica esta data como último dia da decoração de Natal; confirme antes da visita.', coordinates:[-0.6060,51.4760], wiki:'The Long Walk, Windsor' },
+        { time:'16:30', name:'Estação Windsor & Eton Riverside', note:'Estação de retorno a Londres após o passeio.', coordinates:[-0.6050,51.4850], wiki:'Windsor and Eton Riverside railway station' },
+      ]},
+      { id:'2027-01-05', label:'Ter 5/1 · Sea Life e British Museum', pace:'Moderado', places:[
+        { time:'10:00', name:'SEA LIFE London Aquarium', note:'Aquário ao lado da London Eye, com túnel subaquático, tubarões e pinguins. Reserve horário e cerca de 1h30.', coordinates:[-0.1198,51.5010], wiki:'Sea Life London Aquarium', photo:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Underwater_Walk_of_Sea_Life_London_Aquarium.jpg/1280px-Underwater_Walk_of_Sea_Life_London_Aquarium.jpg', photoPage:'https://commons.wikimedia.org/wiki/File:Underwater_Walk_of_Sea_Life_London_Aquarium.jpg' },
+        { time:'12:30', name:'Almoço na South Bank', note:'Pausa para almoço junto ao Tâmisa antes de seguir para Bloomsbury.', coordinates:[-0.1160,51.5050], wiki:'South Bank' },
+        { time:'14:30', name:'British Museum', note:'Museu gratuito com a Pedra de Roseta, múmias egípcias e esculturas do Partenon. Reserve horário; planeje de 2h a 2h30.', coordinates:[-0.1270,51.5194], wiki:'British Museum' },
+      ]},
+      { id:'2027-01-06', label:'Qua 6/1 · Partida', pace:'Leve', places:[
+        { time:'10:00', name:'Imperial War Museum', note:'Museu gratuito com aviões e foguete suspensos no átrio e galerias sobre as guerras mundiais. Reserve de 2h a 3h.', coordinates:[-0.1085,51.4957], wiki:'Imperial War Museum' },
+        { time:'15:00', name:'Hospedagem · Lambeth North', note:'Volta para pegar as malas. Combine com o anfitrião a devolução das chaves; a hospedagem fica reservada até 7/1.', coordinates:[-0.1123,51.4991], wiki:'Lambeth North tube station' },
+        { time:'15:45', name:'Heathrow', note:'Bakerloo line até Paddington e Elizabeth line até Heathrow. O roteiro estima chegada por volta das 17h para o voo das 20h.', coordinates:[-0.4543,51.4700], wiki:'Heathrow Airport' },
+      ]},
+    ];
+    const places = itinerary.flatMap(day => day.places.map(place => ({ ...place, day:day.id, dayLabel:day.label })));
+
+    const token = 'pk.eyJ1IjoiZWR1dmNkIiwiYSI6ImNtd3YxZ3hvNzAzczIyenMwd3VlZDdpMTUifQ.ktBtkFKa6xfVc-pC5tKDiw';
+    const days = itinerary;
+    let activeDay = 'all';
+    let markers = [];
+    let map;
+    const summaries = new Map();
+
+    const daysEl = document.querySelector('#days');
+    const placesEl = document.querySelector('#places');
+    const dayTitle = document.querySelector('#day-title');
+    const count = document.querySelector('#count');
+
+    function focusPlace(index) {
+      document.querySelectorAll('.place').forEach(button => button.classList.toggle('selected', Number(button.dataset.index) === index));
+      if (map) {
+        map.flyTo({ center: places[index].coordinates, zoom: 15 });
+        if (!markers[index].getPopup().isOpen()) markers[index].togglePopup();
+      }
+    }
+
+    function fitVisible() {
+      const visible = places.filter(place => activeDay === 'all' || place.day === activeDay);
+      if (visible.length === 1) { map.flyTo({ center: visible[0].coordinates, zoom: 14 }); return; }
+      const bounds = new mapboxgl.LngLatBounds();
+      visible.forEach(place => bounds.extend(place.coordinates));
+      map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 600 });
+    }
+
+    function render() {
+      const visible = activeDay === 'all' ? places : places.filter(place => place.day === activeDay);
+      const selectedDay = itinerary.find(day => day.id === activeDay);
+      dayTitle.textContent = selectedDay ? `${selectedDay.label} · ${selectedDay.pace}` : 'Todos os dias';
+      count.textContent = `${visible.length} lugares`;
+      placesEl.innerHTML = visible.map(place => `<button class="place" data-index="${places.indexOf(place)}"><span class="number">${places.indexOf(place) + 1}</span><span><span class="place-time">${place.time}</span><span class="place-name">${place.name}</span><span class="place-note">${place.note}</span></span><span class="arrow">›</span></button>`).join('');
+      placesEl.querySelectorAll('.place').forEach(button => button.addEventListener('click', () => focusPlace(Number(button.dataset.index))));
+      daysEl.innerHTML = `<button class="day ${activeDay === 'all' ? 'active' : ''}" data-day="all">Tudo</button>` + days.map(day => `<button class="day ${activeDay === day.id ? 'active' : ''}" data-day="${day.id}">${day.label.slice(0, 3)} ${day.id.slice(8, 10)}/${day.id.slice(5, 7)}</button>`).join('');
+      daysEl.querySelectorAll('.day').forEach(button => button.addEventListener('click', () => {
+        activeDay = button.dataset.day;
+        render();
+        if (map) fitVisible();
+      }));
+      markers.forEach((marker, index) => marker.getElement().style.display = activeDay === 'all' || places[index].day === activeDay ? '' : 'none');
+    }
+
+    function loadPhoto(place, image, credit) {
+      if (place.photo) {
+        image.alt = `Foto de ${place.name}`;
+        image.onerror = () => { image.hidden = true; credit.textContent = 'Foto indisponível'; };
+        image.src = place.photo;
+        image.hidden = false;
+        credit.href = place.photoPage;
+        credit.textContent = 'Foto: ʘx · CC BY-SA 4.0';
+        return;
+      }
+      if (!place.wiki) return;
+      if (!summaries.has(place.wiki)) {
+        summaries.set(place.wiki, fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place.wiki)}`)
+          .then(response => response.ok ? response.json() : null)
+          .catch(() => null));
+      }
+      summaries.get(place.wiki).then(summary => {
+        if (!summary?.thumbnail?.source) { credit.textContent = 'Foto indisponível'; return; }
+        image.src = summary.thumbnail.source;
+        image.alt = `Foto de ${place.name}`;
+        image.hidden = false;
+        image.onerror = () => { image.hidden = true; credit.textContent = 'Foto indisponível'; };
+        credit.href = summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(place.wiki.replaceAll(' ', '_'))}`;
+        credit.textContent = 'Imagem: Wikipédia';
+      });
+    }
+
+    function makePopup(place) {
+      const card = document.createElement('article');
+      card.className = 'popup-card';
+      const image = document.createElement('img');
+      image.hidden = true;
+      const copy = document.createElement('div');
+      copy.className = 'popup-copy';
+      const title = document.createElement('strong');
+      title.textContent = place.name;
+      const description = document.createElement('p');
+      description.textContent = place.note;
+      const credit = document.createElement('a');
+      credit.className = 'popup-credit';
+      credit.target = '_blank';
+      credit.rel = 'noopener';
+      credit.textContent = 'Buscando foto…';
+      copy.append(title, description, credit);
+      card.append(image, copy);
+      const popup = new mapboxgl.Popup({ offset:16, maxWidth:'290px' }).setDOMContent(card);
+      popup.on('open', () => loadPhoto(place, image, credit));
+      return popup;
+    }
+
+    render();
+    if (token === 'COLE_SEU_TOKEN_PUBLICO_AQUI') {
+      document.querySelector('#map-error').style.display = 'grid';
+    } else {
+      mapboxgl.accessToken = token;
+      map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: [-0.118, 51.51], zoom: 12 });
+      map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+      places.forEach((place, index) => {
+        const element = document.createElement('div');
+        element.textContent = index + 1;
+        Object.assign(element.style, { width:'28px', height:'28px', borderRadius:'50%', background:'#385c49', color:'#fff', border:'2px solid white', boxShadow:'0 2px 7px #15231a55', display:'grid', placeItems:'center', font:'700 12px DM Sans,sans-serif', cursor:'pointer' });
+        const marker = new mapboxgl.Marker({ element }).setLngLat(place.coordinates).setPopup(makePopup(place)).addTo(map);
+        markers.push(marker);
+      });
+      map.on('load', fitVisible);
+    }
+  </script>
+</body>
+</html>
