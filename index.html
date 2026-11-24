@@ -183,7 +183,7 @@
       const selectedDay = itinerary.find(day => day.id === activeDay);
       dayTitle.textContent = selectedDay ? `${selectedDay.label} · ${selectedDay.pace}` : 'Todos os dias';
       count.textContent = `${visible.length} lugares`;
-      placesEl.innerHTML = visible.map(place => `<button class="place" data-index="${places.indexOf(place)}"><span class="number">${places.indexOf(place) + 1}</span><span><span class="place-time">${place.time}</span><span class="place-name">${place.name}</span><span class="place-note">${place.note}</span></span><span class="arrow">›</span></button>`).join('');
+      placesEl.innerHTML = visible.map((place, index) => `<button class="place" data-index="${places.indexOf(place)}"><span class="number">${index + 1}</span><span><span class="place-time">${place.time}</span><span class="place-name">${place.name}</span><span class="place-note">${place.note}</span></span><span class="arrow">›</span></button>`).join('');
       placesEl.querySelectorAll('.place').forEach(button => button.addEventListener('click', () => focusPlace(Number(button.dataset.index))));
       daysEl.innerHTML = `<button class="day ${activeDay === 'all' ? 'active' : ''}" data-day="all">Tudo</button>` + days.map(day => `<button class="day ${activeDay === day.id ? 'active' : ''}" data-day="${day.id}">${day.label.slice(0, 3)} ${day.id.slice(8, 10)}/${day.id.slice(5, 7)}</button>`).join('');
       daysEl.querySelectorAll('.day').forEach(button => button.addEventListener('click', () => {
@@ -191,7 +191,13 @@
         render();
         if (map) fitVisible();
       }));
-      markers.forEach((marker, index) => marker.getElement().style.display = activeDay === 'all' || places[index].day === activeDay ? '' : 'none');
+      markers.forEach((marker, index) => {
+        const number = visible.indexOf(places[index]) + 1;
+        const element = marker.getElement();
+        element.style.display = number ? 'grid' : 'none';
+        if (number) element.firstElementChild.textContent = number;
+        else if (marker.getPopup().isOpen()) marker.togglePopup();
+      });
     }
 
     function loadPhoto(place, image, credit) {
@@ -253,7 +259,9 @@
       map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
       places.forEach((place, index) => {
         const element = document.createElement('div');
-        element.textContent = index + 1;
+        const number = document.createElement('span');
+        number.textContent = index + 1;
+        element.append(number);
         Object.assign(element.style, { width:'28px', height:'28px', borderRadius:'50%', background:'#385c49', color:'#fff', border:'2px solid white', boxShadow:'0 2px 7px #15231a55', display:'grid', placeItems:'center', font:'700 12px DM Sans,sans-serif', cursor:'pointer' });
         const marker = new mapboxgl.Marker({ element }).setLngLat(place.coordinates).setPopup(makePopup(place)).addTo(map);
         markers.push(marker);
